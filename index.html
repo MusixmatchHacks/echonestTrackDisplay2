@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+<head>
+	<title>Echonest analysis displayer</title>
+</head>
+/*.chart rect {
+  fill: steelblue;
+}
+
+.chart text {
+  fill: white;
+  font: 10px sans-serif;
+  text-anchor: end;
+}*/
+
+</style>
+<link rel="stylesheet" href="style.css">
+<script src = "savePlaylist.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+<!-- <script src="http://cdnjs.cloudflare.com/ajax/libs/jquery-backstretch/2.0.4/jquery.backstretch.min.js"></script> -->
+<!-- <body onload="doit()"> -->
+<body>
+<header>
+	<div class="container" >
+		<!-- <a href = "http://musixmatch.com/" style="display:inline"><img src="http://musixmatch.com/img/mxm_logo_white.png" style = "padding-left: 30px;" width="135" alt="Musixmatch" id="Musixmatch"/></a> -->
+		<img src="http://musixmatch.com/img/mxm_logo_white.png" style = "padding-left: 3.9%;" width="135" alt="Musixmatch" id="Musixmatch"/>
+		<p style = "display:inline; padding-left: 14.7%;font-size:24px;text-transform: uppercase;" >Instrumental or not</p>
+		<a href="http://research.musixmatch.com/post/92641962100/imgine-from-lyrics-to-images" style = "display:inline; padding-right: 19.6%;
+padding-top: 5px;">About the project</a>
+	</div>
+</header>
+<!--  <h1>Musixmatch curator</h1>
+<h2>Create a Spotify playlist of songs with lyrics containing searched word/s or with lyrics similar to a track</h2> -->
+ <!-- 	<form name="form1" id = 'searchForm' method="get">
+		
+	</form>
+
+ -->
+ 	<!-- <div id="imageContainer">	 -->
+ 		<input type="search" id="mxmTrackSearch" placeholder="Insert Track-Artist" />
+
+<!-- 	<select id = "searchType">
+  		<option value="words" >Search with 'Words'</option>
+  		<option value="track">Search with 'Track-Artist'</option>
+  		<option value="mxmId" disabled>MusixmatchID</option>
+	</select>
+ --> 	
+ <!-- 	<div id = "playlistTypeContainer" style = "display:none">
+ 		More covers songs<input type="range"  id="cover_songs" min="0" max="15" />Less cover songs
+	</div> -->
+
+		<div id = "buttonContainer" style = "display:none">
+ 			<input type="button" value="Get Images" id = "getImages">
+ 		</div>
+ 	
+<!--  	<div style = "display:none">
+			Similarity to query: less<input type="range"  id="max_query_terms" name="max_query_terms" min="1" max="30" />more
+	</div>
+	<div style = "display:none">
+			Number of tracks to : more<input type="range"  id="min_term_freq" name="min_term_freq" min="1" max="30" />less
+	</div> -->
+		<div id = "status" style = "display:inline"></div>
+		<div id = "progress" style = "display:none" ><img src = 'ajax-loader.gif'> </div>
+		<div id = "SpotifyWidget" > </div>
+		<div id = "metadata" style = "display:none"></div>
+		<!-- <progress id = "ProgressBar" value="0" max="100" style = ""></progress> -->
+<!-- 	<div> <input type="button" value="Save This Playlist To Spotify" id = "SpotifySave" style = "display:none"> </div> -->
+		
+	<!-- <div id = "ImageDisplay" style = "display:none" ><img id = "Image"> </div> -->
+<!-- <footer>
+	Uses <a href="https://developer.musixmatch.com/">Musixmatch API</a>, <a href="https://developer.spotify.com/web-api/">Spotify web API</a> and <a href="https://developer.spotify.com/technologies/widgets/">Spotify widgets</a>. Contact the author at <a href="https://twitter.com/neotheoen">@neotheoen</a>.
+</footer> -->
+	<!-- </div> -->
+</body>
+<!-- <svg class="chart"></svg> -->
+<!-- <script src="http://jpillora.com/xdomain/dist/0.6/xdomain.min.js" master="localhost:8888"></script> -->
+<!-- <script src="jquery-1.11.1.min.js"></script> -->
+
+
+<script>
+$("#mxmTrackSearch").focus();
+// document.getElementById('mxmTrackSearch').focus();
+searchQuery = document.getElementById('mxmTrackSearch')	
+// searchForm = document.getElementById('searchForm')
+// searchType = document.getElementById('searchType')
+// min_term_freq = document.getElementById('min_term_freq')
+//console.log(min_term_freq.value)
+//max_query_terms = document.getElementById('max_query_terms')
+//SpotifySave = document.getElementById('SpotifySave')
+GetImages  = document.getElementById('getImages')
+//PlaylistTypeContainer = document.getElementById('playlistTypeContainer')
+//covers = document.getElementById('cover_songs')
+var mxmAPI_base = 'https://api.musixmatch.com/ws/1.1/'
+var apiKey = 'd8951a826384c648324e206c942b5cce'
+var tagAPI_base = 'http://glacial-hollows-8890.herokuapp.com/lyrics_analysis/v1.0'
+var mxmAPI_base_new = 'http://apic.musixmatch.com/ws/1.1/'
+var echonest_base = 'http://developer.echonest.com/api/v4/track/profile?api_key='
+var echonest_song_base = 'http://developer.echonest.com/api/v4/song/profile?api_key='
+var echonest_search_base = 'http://developer.echonest.com/api/v4/song/search?api_key='
+var echonest_api_key = 'UUZDTANXIMNN98YW6'
+
+var spotify_auth_base = 'https://accounts.spotify.com/authorize'
+var spotify_client_ID = '14fb55b1df36454793caa07ab8abefe6'
+var spotify_client_secret = 'cf72548f86e8493d8aa38cc881a63ee4'
+
+var have_valid_playlist = false
+
+function getJSON(url) 
+{
+	var get_promise = $.getJSON(url);
+	//console.log(url)
+	return get_promise.then(JSON.stringify).then(JSON.parse);
+}
+
+function getJSONTrackRelated(track_id) 
+{
+	var url = mxmAPI_base + 'track.related.get?apikey=' + apiKey +'&page_size=100&g_commontrack=1&max_query_terms'+ max_query_terms.value + '&min_term_freq=' + min_term_freq.value + '&track_id=' + track_id +'&format=jsonp&callback=?'
+	var url = encodeURI(url)
+	var get_promise = $.getJSON(url);
+	//console.log(url)
+	return get_promise.then(JSON.stringify).then(JSON.parse);
+		//console.log(url)
+		//return getJSON(url);
+}
+
+function checkRepetition(track_list, track)
+{
+	return track_list.some(function(current_track)
+	{
+		if (current_track.artist_name == track.artist_name)
+		{
+			if (current_track.track_name == track.track_name) 
+			{
+				return true
+			}
+		}
+		//return false
+	})
+}
+
+function makePlaylist(seed_URI, search_with_words) //enter URI which has tracklist to build playlist of related tracks. search_with_words is a flag to accomodate different kind of JSON response structure fetched from the seed_URI
+{
+	final_playlist_ids = new Array()
+	final_playlist_tracks = new Array()
+	seed_track_ids = new Array()
+	var repeatFlag = false
+
+	return new Promise(function(resolve,reject)
+	{
+		getJSON(seed_URI).then(function(response){
+		//console.log(123)
+		//console.log(response)
+			if (response.message.header.status_code == 200)
+			{	
+				//console.log(3)
+				if(search_with_words)
+				{	
+					track_list = response.message.body.track_list
+				}
+
+				if(!search_with_words)
+				{
+					track_list = response.message.body	
+				}
+				
+				//console.log(response.message.body.track_list[0])
+				//seed_track_id = response.message.body.track_list[0].track.track_id
+				//console.log(seed_URI)
+				seed_tracks_length = (track_list.length <= 9) ? track_list.length:9 //number of seed tracks to use
+				//console.log(seed_tracks_length)
+				var j =1
+				for (var i = 0;i<track_list.length ; i++) 
+				{
+					//console.log(i)
+					if (track_list[i].track.track_spotify_id != "")
+					{
+						repeatFlag = checkRepetition(final_playlist_tracks, track_list[i].track)
+						//console.log(repeatFlag)
+						if (repeatFlag == false)
+						{
+							seed_track_ids.push(track_list[i].track.track_id)
+							final_playlist_ids.push(track_list[i].track.track_spotify_id)
+							final_playlist_tracks.push(track_list[i].track)
+							j++
+						}
+					}
+
+					if(j>seed_tracks_length) break;
+					
+					//console.log(final_playlist_ids) 
+				};
+				//console.log(seed_track_ids)
+				//console.log(final_playlist_ids)
+
+				//return
+				if (seed_track_ids == 0)
+				{
+					//$("#status").text("No songs found with these search terms.")
+					reject(Error("No playlist"))
+				}
+				 
+				else
+				{ 
+					$("#status").text("Making spotify playlist") // misplaced message but saves the trouble of writing a proper progress bar
+					Promise.all(seed_track_ids.map(getJSONTrackRelated))
+					.then(function(values){
+						//console.log(values)
+						//$("#status").text("Making spotify playlist")
+						values.forEach(function(result){
+							if (result.message.header.status_code == 200)
+							{
+								related_track_list =  result.message.body
+								//console.log(related_track_list)
+								var j = 1
+								for (var idx = 0; idx<related_track_list.length ; idx++) 
+								{
+									if (related_track_list[idx].track.track_spotify_id != "")
+									{
+										repeatFlag = checkRepetition(final_playlist_tracks, related_track_list[idx].track)
+										//console.log(repeatFlag)
+										if (repeatFlag == false)
+										{
+											final_playlist_ids.push(related_track_list[idx].track.track_spotify_id);
+											final_playlist_tracks.push(related_track_list[idx].track)
+											j++;
+										}
+											//console.log(1)
+									}	
+									if(j>4) break;
+									//console.log(related_track_list[idx].track.track_spotify_id)
+								}
+							}
+						})
+
+					resolve(final_playlist_ids)
+					//return Promise.resolve(final_playlist_ids)
+					})
+				}
+			}
+			else
+			{
+				reject(Error(response.message))
+
+			}
+		})
+	})		
+}
+	
+function getMxmAndSpotifyIdFromMacro(response)
+{
+	//console.log(response.message.body.track)
+	return new Promise(function(resolve, reject){
+		if (response.message.header.status_code == 200) 
+		{
+			//console.log(response.message.body.track.track_id)
+			// var url = mxmAPI_base + 'track.related.get?apikey=' + apiKey +'&page_size=100&g_commontrack=1&max_query_terms='+ max_query_terms.value + '&min_term_freq=' + min_term_freq.value + '&track_id=' + response.message.body.track.track_id +'&format=jsonp&callback=?'
+			if (response.message.body.macro_calls["matcher.track.get"].message.header.status_code == 200) 
+			{
+				track_ids = new Array()
+				track_ids.push(response.message.body.macro_calls["matcher.track.get"].message.body.track.track_id)
+				return getSpotifyIdFromMxmIdEchonest(response.message.body.macro_calls["matcher.track.get"].message.body.track.track_id).then(function(spotifyId){
+					console.log(spotifyId)
+					track_ids.push(spotifyId)
+					resolve (track_ids)
+				})
+				//console.log(response.message.body.macro_calls)
+				// track_ids.push(response.message.body.macro_calls["matcher.track.get"].message.body.track.track_id, response.message.body.macro_calls["matcher.track.get"].message.body.track.track_spotify_id)
+				
+
+			}
+			
+			else
+			{
+				reject (Error("No tracks found with this query. Try again please."))		
+			}
+		}
+		else
+		{
+			reject (Error("No tracks found with this query. Try again please."))
+		}	
+	})
+}			
+
+function getSpotifyIdFromMxmIdEchonest(mxmId)
+{
+	echonest_query_URI = echonest_song_base + echonest_api_key + '&id=musixmatch-WW:song:' + mxmId + '&bucket=id:spotify-WW&bucket=tracks' + '&format=jsonp&callback=?'//'&f_has_lyrics=1'
+	echonest_query_URI = encodeURI(echonest_query_URI)
+	console.log(echonest_query_URI)
+	return getJSON(echonest_query_URI).then(function(data){
+		//console.log(data)
+		//track_ids.push(data.response.songs[0].tracks[0].foreign_id.replace('spotify:track:',''))
+		//return Promise.
+		return data.response.songs[0].tracks[0].foreign_id.replace('spotify:track:','')
+		// return Promise.resolve(data.response.songs[0].tracks[0].foreign_id.replace('spotify:track:',''))
+	})
+}
+
+function getMxmAndSpotifyIdFromEchonest(response)
+{
+	//console.log(response.message.body.track)
+	return new Promise(function(resolve, reject){
+		if (response.response.status.message == 'Success')//200) 
+		{
+			//console.log(response.message.body.track.track_id)
+			// var url = mxmAPI_base + 'track.related.get?apikey=' + apiKey +'&page_size=100&g_commontrack=1&max_query_terms='+ max_query_terms.value + '&min_term_freq=' + min_term_freq.value + '&track_id=' + response.message.body.track.track_id +'&format=jsonp&callback=?'
+			try  
+			{
+				track_ids = new Array()
+				//console.log(response.message.body.macro_calls)
+				track_ids.push(response.response.songs[0].foreign_ids[0].foreign_id.replace('musixmatch-WW:song:',''))
+				echonest_query_URI = echonest_song_base + echonest_api_key + '&id=' + response.response.songs[0].foreign_ids[0].foreign_id + '&bucket=id:spotify-WW&bucket=tracks' + '&format=jsonp&callback=?'//'&f_has_lyrics=1'
+				echonest_query_URI = encodeURI(echonest_query_URI)
+				console.log(echonest_query_URI)
+				return getJSON(echonest_query_URI).then(function(data){
+					console.log(data)
+					track_ids.push(data.response.songs[0].tracks[0].foreign_id.replace('spotify:track:',''))
+					//return Promise.
+					resolve(track_ids)
+				})
+				//mxmSearchId = response.songs.foreign_ids[0].replace('musixmatch-WW:song:','')
+				//http://developer.echonest.com/api/v4/song/profile?api_key=UUZDTANXIMNN98YW6&format=json&id=musixmatch-WW:song:15175339&bucket=id:spotify-WW&bucket=tracks
+				// track_ids.push(response.message.body.macro_calls["matcher.track.get"].message.body.track.track_id, response.message.body.macro_calls["matcher.track.get"].message.body.track.track_spotify_id)
+				
+
+			}
+			
+			catch(error)
+			{
+				reject (Error("No tracks found with this query. Try again please."))		
+			}
+		}
+		else
+		{
+			reject (Error("No tracks found with this query. Try again please."))
+		}	
+	})
+}
+function getTrackId(response)
+{
+	//console.log(response.message.body.track)
+	return new Promise(function(resolve, reject){
+		if (response.message.header.status_code == 200) 
+		{
+			console.log(response.message.body.track.track_id)
+			var url = mxmAPI_base + 'track.related.get?apikey=' + apiKey +'&page_size=100&g_commontrack=1&max_query_terms='+ max_query_terms.value + '&min_term_freq=' + min_term_freq.value + '&track_id=' + response.message.body.track.track_id +'&format=jsonp&callback=?'
+			resolve (url)
+		}
+		else
+		{
+			reject (Error("No tracks found with this query. Try again please."))
+		}	
+	})
+}			
+
+function getTagsAndImages () 
+{
+	words = searchQuery.value//.split(" ")
+
+	var seed_query = mxmAPI_base_new + 'macro.subtitles.get?app_id=windows-phone-v1.0&usertoken=d504588b033ab537a146ded771c5d4cd29f52c30aed39cd5' + '&q_track=' + searchQuery.value + '&f_has_lyrics=1'
+	// var seed_query = echonest_search_base + echonest_api_key + '&combined=' + searchQuery.value + '&bucket=id:musixmatch-WW&limit=true&bucket=tracks' + '&format=jsonp&callback=?'//'&f_has_lyrics=1'
+	//mxmAPI_base + 'matcher.track.get?apikey=' + apiKey + '&q_track=' + searchQuery.value + '&f_has_lyrics=1' + '&format=jsonp&callback=?'
+	// mxmAPI_base_new + 'macro.subtitles.get?app_id=windows-phone-v1.0&usertoken=d504588b033ab537a146ded771c5d4cd29f52c30aed39cd5' + '&q_track=' + searchQuery.value + '&f_has_lyrics=1' + '&format=jsonp&callback=?'//'matcher.track.get?apikey=' + apiKey + '&q_track=' + searchQuery.value + '&f_has_lyrics=1' + '&format=jsonp&callback=?'
+	// http://developer.echonest.com/api/v4/song/search?api_key=UUZDTANXIMNN98YW6&format=json&artist=radiohead&title=creep&bucket=id:musixmatch-WW&limit=true&bucket=tracks
+	var seed_queryURI = encodeURI(seed_query)
+	console.log(seed_queryURI)
+	// $('#imageContainer').backstretch("destroy",false)
+	// $.backstretch("destroy",false)
+	$('#SpotifyWidget').empty()
+	$('#metadata').empty()
+	//document.getElementById("SpotifyWidget").style.visibility = "hidden"
+	//document.getElementById("SpotifySave").style.display = "none"
+	$("#status").text("Searching Musixmatch for this song")
+	document.getElementById("progress").style.display = "inline-block"
+
+	getJSON(seed_queryURI).then(function(response){
+		//console.log(response)
+		//window.resp = response
+		return getMxmAndSpotifyIdFromMacro(response).then(function(track_ids){
+		// return getMxmAndSpotifyIdFromEchonest(response).then(function(track_ids){
+		 	console.log(track_ids)
+		 	if(track_ids[1] != '')
+		 	{
+		 		// url = echonest_base + echonest_api_key + '&id=spotify-WW:track:'+track_ids[1] + '&bucket=audio_summary' + '&format=jsonp&callback=?'//'/tags.images?trackID=' + track_ids[0] + '&format=jsonp&callback=?'
+		 		url = echonest_base + echonest_api_key + '&id=musixmatch-WW:track:'+track_ids[0] + '&bucket=audio_summary' + '&format=jsonp&callback=?'
+		 	}
+		 	else
+		 	{
+		 		$("#status").text("Corresponding spotify id not found in musixmatch db")
+		 		document.getElementById("progress").style.display = "none"
+
+		 		return Promise.reject()
+		 	}
+		 	url = encodeURI(url)
+		 	$("#status").text("Searching echonest analysis")
+		 	console.log(url)
+		 	return getJSON(url).then(function(echonest_response){
+		 		$("#status").text("Done")
+		 		console.log(echonest_response)
+		 		document.getElementById("progress").style.display = "none"
+		 		document.getElementById("metadata").style.display = "inline"
+		 		try
+		 		{
+		 			if (Number(echonest_response.response.track.audio_summary.instrumentalness) >= 0.8) {document.getElementById("metadata").innerHTML += 'Instrumental'}
+		 			else {document.getElementById("metadata").innerHTML += 'Not instrumental - has human voices'}
+		 			$("#status").text("")
+		 		}
+
+		 		catch (error)
+		 		{
+		 			document.getElementById("metadata").innerHTML += "Echonest doesn't have this data yet"
+		 			$("#status").text("")
+		 		}
+		 		// if (Number(echonest_response.response.track.audio_summary.instrumentalness) <= 0.5) {document.getElementById("metadata").innerHTML += 'Not instrumental'}	
+
+
+		 		// document.getElementById("metadata").innerHTML += 'instrumentalness = ' + JSON.stringify(echonest_response.response.track.audio_summary.instrumentalness,null,' ') //'<pre><code>' + JSON.stringify(echonest_response.response.track,null,' ') + '</pre></code>'//'<pre><code>' + echonest_response + '</pre></code>'
+
+		 		if(track_ids[1] != "")
+		 		{
+		 			var src = "https://embed.spotify.com/?uri=spotify:track:"+ track_ids[1].toString()
+		 			document.getElementById("SpotifyWidget").style.visibility = "visible"
+		 			document.getElementById("SpotifyWidget").innerHTML += '<iframe id = "SpotifyWidgetFrame" frameborder="0" allowtransparency="true" width="300" height="80" style = "display:inline"></iframe>'
+		 			document.getElementById("SpotifyWidgetFrame").src = src
+		 			console.log(document.getElementById("SpotifyWidgetFrame"))
+		 		}
+		 		//console.log(src)
+		 		else
+		 		{
+		 			$("#status").text("Spotify track not found")
+		 		}
+		 	})
+		 	
+		 }, function(error){
+		 	//console.log('123')
+		 	$("#status").text("Musixmatch macro method 404")
+		 	document.getElementById("progress").style.display = "none"
+
+		 })
+		// 	url = tagAPI_base + '/tags.images?trackID=' + track_ids[0] + '&format=jsonp&callback=?'
+		// 	url = encodeURI(url)
+		// 	$("#status").text("Searching for images (please try again if stuck here)")
+		// 	console.log(url)
+		// 	return getJSON(url).then(function(response){
+		// 		$("#status").text("Done")
+		// 		console.log('2')
+		// 		document.getElementById("progress").style.display = "none"
+		// 		if(track_ids[1] != "")
+		// 		{
+		// 			var src = "https://embed.spotify.com/?uri=spotify:track:"+ track_ids[1].toString()
+		// 			document.getElementById("SpotifyWidget").style.visibility = "visible"
+		// 			document.getElementById("SpotifyWidget").innerHTML += '<iframe id = "SpotifyWidgetFrame" frameborder="0" allowtransparency="true" width="300" height="80" style = "display:inline"></iframe>'
+		// 			document.getElementById("SpotifyWidgetFrame").src = src
+		// 			console.log(document.getElementById("SpotifyWidgetFrame"))
+		// 		}
+		// 		//console.log(src)
+		// 		else
+		// 		{
+		// 			$("#status").text("Spotify track not found")
+		// 		}
+		// 		photos = []
+		// 		response.tags.forEach(function(data){
+		// 			photo_urls = data.photo_urls
+		// 			photo_urls.forEach(function(photo){
+		// 				photos.push(photo)
+		// 			})
+		// 		})
+		// 		// console.log(photos)
+		// 		//document.getElementById("ImageDisplay").style.display = "inline-block"
+		// 		// $('#imageContainer').backstretch(photos, {duration: 5000, fade: 1000, centeredX: true, centeredY: true});
+		// 		$.backstretch(photos, {duration: 8000, fade: 1000, centeredX: true, centeredY: true});
+		// 		$("#status").text("")
+		// 		return Promise.resolve()
+		// 	})
+
+		// }, function(error){
+		// 	console.log(error)
+		// 	$("#status").text("No tracks found with this query. Try again please.")
+		// 	document.getElementById("progress").style.display = "none"
+		// 	// photos = ["http://i.imgur.com/83ghVct.jpg"]
+		// 	// $('#imageContainer').backstretch(photos, {duration: 5000, fade: 1000, centeredX: true, centeredY: true});
+		// 	// $.backstretch(photos, {duration: 5000, fade: 1000, centeredX: true, centeredY: true});
+		// 	return Promise.reject()
+
+		// })
+		// //console.log
+	})
+}
+
+
+$("#mxmTrackSearch").keyup(function(event) {
+    if (event.keyCode == 13) {
+        getTagsAndImages();
+    }
+});
+
+
+GetImages.onclick = function(e){
+	getTagsAndImages()
+}
+
+// $(window).blur(function(e){
+//     //$('#result').text('Clicked out of the window or on the iframe');
+//     console.log('Clicked out of the window or on the iframe')
+// })
+// SpotifySave.onclick = function(e){
+//   loginWithSpotify()
+// }
+
+
+</script>
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-53134539-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+
+</script>
